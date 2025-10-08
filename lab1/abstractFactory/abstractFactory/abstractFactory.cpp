@@ -1,120 +1,260 @@
 ﻿#include <iostream>
 #include <string>
 #include <memory>
+#include <map>
 
-class Button {
+class AudioTrack {
 public:
-  virtual ~Button() = default;
-  virtual void render() const = 0;
-  virtual void onClick() const = 0;
+  virtual ~AudioTrack() = default;
+  virtual void play() const = 0;
+  virtual std::string getLanguage() const = 0;
 };
 
-class WindowsButton : public Button {
+class Subtitles {
 public:
-  void render() const override {
-    std::cout << "[Windows] Отрисована кнопка в стиле Windows" << std::endl;
-  }
-
-  void onClick() const override {
-    std::cout << "[Windows] Выполнено действие при клике на кнопку Windows" << std::endl;
-  }
+  virtual ~Subtitles() = default;
+  virtual void display() const = 0;
+  virtual std::string getLanguage() const = 0;
 };
 
-class LinuxButton : public Button {
+class RussianAudio : public AudioTrack {
 public:
-  void render() const override {
-    std::cout << "[Linux] Отрисована кнопка в стиле Linux" << std::endl;
+  void play() const override {
+    std::cout << "Воспроизведение русской звуковой дорожки" << std::endl;
   }
 
-  void onClick() const override {
-    std::cout << "[Linux] Выполнено действие при клике на кнопку Linux" << std::endl;
+  std::string getLanguage() const override {
+    return "Russian";
   }
 };
 
-class GUIFactory {
+class RussianSubtitles : public Subtitles {
 public:
-  virtual ~GUIFactory() = default;
+  void display() const override {
+    std::cout << "[Русские субтитры: Привет, мир!]" << std::endl;
+  }
 
-  virtual std::unique_ptr<Button> createButton() const = 0;
-};
-
-class WindowsFactory : public GUIFactory {
-public:
-  std::unique_ptr<Button> createButton() const override {
-    return std::make_unique<WindowsButton>();
+  std::string getLanguage() const override {
+    return "Russian";
   }
 };
 
-class LinuxFactory : public GUIFactory {
+class EnglishAudio : public AudioTrack {
 public:
-  std::unique_ptr<Button> createButton() const override {
-    return std::make_unique<LinuxButton>();
+  void play() const override {
+    std::cout << "Playing English audio track" << std::endl;
+  }
+
+  std::string getLanguage() const override {
+    return "English";
   }
 };
 
-class Application {
+class EnglishSubtitles : public Subtitles {
+public:
+  void display() const override {
+    std::cout << "[English subtitles: Hello, world!]" << std::endl;
+  }
+
+  std::string getLanguage() const override {
+    return "English";
+  }
+};
+
+class FilmFactory {
+public:
+  virtual ~FilmFactory() = default;
+  virtual std::unique_ptr<AudioTrack> createAudioTrack() const = 0;
+  virtual std::unique_ptr<Subtitles> createSubtitles() const = 0;
+  virtual std::string getLanguage() const = 0;
+};
+
+class RussianFilmFactory : public FilmFactory {
+public:
+  std::unique_ptr<AudioTrack> createAudioTrack() const override {
+    return std::make_unique<RussianAudio>();
+  }
+
+  std::unique_ptr<Subtitles> createSubtitles() const override {
+    return std::make_unique<RussianSubtitles>();
+  }
+
+  std::string getLanguage() const override {
+    return "Russian";
+  }
+};
+
+class EnglishFilmFactory : public FilmFactory {
+public:
+  std::unique_ptr<AudioTrack> createAudioTrack() const override {
+    return std::make_unique<EnglishAudio>();
+  }
+
+  std::unique_ptr<Subtitles> createSubtitles() const override {
+    return std::make_unique<EnglishSubtitles>();
+  }
+
+  std::string getLanguage() const override {
+    return "English";
+  }
+};
+
+class Movie {
 private:
-  std::unique_ptr<GUIFactory> factory;
-  std::unique_ptr<Button> button;
+  std::string title;
+  std::unique_ptr<AudioTrack> audio_track;
+  std::unique_ptr<Subtitles> subtitles;
+  std::string language;
 
 public:
-  Application(std::unique_ptr<GUIFactory> factory_)
-    : factory(std::move(factory_)) {
+  Movie(const std::string& title_, std::unique_ptr<FilmFactory> factory_)
+    : title(title_), language(factory_->getLanguage()) {
+    audio_track = factory_->createAudioTrack();
+    subtitles = factory_->createSubtitles();
   }
 
-  void createUI() {
-    std::cout << "=== Создание пользовательского интерфейса ===" << std::endl;
-    button = factory->createButton();
+  void play() const {
+    std::cout << std::endl << "=== Воспроизведение фильма: " << title << " ===" << std::endl;
+    std::cout << "Язык: " << language << std::endl;
+    audio_track->play();
+    subtitles->display();
+    std::cout << "==================================" << std::endl;
   }
 
-  void renderUI() const {
-    std::cout << std::endl << "=== Отрисовка интерфейса ===" << std::endl;
-    button->render();
+  void changeLanguage(std::unique_ptr<FilmFactory> factory_) {
+    language = factory_->getLanguage();
+    audio_track = factory_->createAudioTrack();
+    subtitles = factory_->createSubtitles();
+    std::cout << "Язык фильма изменен на: " << language << std::endl;
   }
 
-  void simulateUserInteraction() const {
-    std::cout << std::endl << "=== Имитация пользовательского взаимодействия ===" << std::endl;
-    button->onClick();
+  std::string getCurrentLanguage() const {
+    return language;
+  }
+
+  std::string getTitle() const {
+    return title;
   }
 };
 
-std::unique_ptr<GUIFactory> createFactory(const std::string& osType) {
-  if (osType == "Windows") {
-    std::cout << "Создана фабрика для Windows" << std::endl;
-    return std::make_unique<WindowsFactory>();
+class CinemaRentalSystem {
+private:
+  std::map<std::string, std::unique_ptr<FilmFactory>> factories;
+  std::map<std::string, std::string> available_movies;
+
+public:
+  CinemaRentalSystem() {
+    registerFactory("russian", std::make_unique<RussianFilmFactory>());
+    registerFactory("english", std::make_unique<EnglishFilmFactory>());
+
+    available_movies = {
+        {"1", "Матрица"},
+        {"2", "Властелин колец"},
+        {"3", "Хоббиты"},
+        {"4", "Гарри Поттер"},
+        {"5", "Нарния"}
+    };
   }
-  else if (osType == "Linux") {
-    std::cout << "Создана фабрика для Linux" << std::endl;
-    return std::make_unique<LinuxFactory>();
+
+  void registerFactory(const std::string& language_, std::unique_ptr<FilmFactory> factory_) {
+    factories[language_] = std::move(factory_);
   }
-  else {
-    throw std::runtime_error("Неизвестный тип ОС: " + osType);
+
+  void displayAvailableMovies() const {
+    std::cout << std::endl << "=== ДОСТУПНЫЕ ФИЛЬМЫ ===" << std::endl;
+    for (const auto& [id, title] : available_movies) {
+      std::cout << id << ". " << title << std::endl;
+    }
+    std::cout << "========================" << std::endl;
   }
-}
+
+  void displayAvailableLanguages() const {
+    std::cout << std::endl << "=== ДОСТУПНЫЕ ЯЗЫКИ ===" << std::endl;
+    for (const auto& [language, _] : factories) {
+      std::cout << "- " << language << std::endl;
+    }
+    std::cout << "=======================" << std::endl;
+  }
+
+  std::unique_ptr<Movie> rentMovie(const std::string& movieId_, const std::string& language_) const {
+    auto movieIt = available_movies.find(movieId_);
+    auto factoryIt = factories.find(language_);
+
+    if (movieIt == available_movies.end()) {
+      std::cout << "Фильм с ID " << movieId_ << " не найден!" << std::endl;
+      return nullptr;
+    }
+
+    if (factoryIt == factories.end()) {
+      std::cout << "Язык " << language_ << " не поддерживается!" << std::endl;
+      return nullptr;
+    }
+
+    std::string title = movieIt->second;
+
+    if (language_ == "russian") {
+      return std::make_unique<Movie>(title, std::make_unique<RussianFilmFactory>());
+    }
+    else if (language_ == "english") {
+      return std::make_unique<Movie>(title, std::make_unique<EnglishFilmFactory>());
+    }
+
+    return nullptr;
+  }
+
+  bool isLanguageSupported(const std::string& language_) const {
+    return factories.find(language_) != factories.end();
+  }
+};
 
 int main() {
   setlocale(LC_ALL, "Russian");
 
-  try {
-    std::string operatingSystems[] = { "Windows", "Linux" };
+  CinemaRentalSystem rentalSystem;
 
-    for (const auto& os : operatingSystems) {
-      std::cout << std::endl << std::string(50, '=') << std::endl;
-      std::cout << "Тестирование для " << os << std::endl;
-      std::cout << std::string(50, '=') << std::endl;
+  std::cout << "=== СИСТЕМА КИНОПРОКАТА ===" << std::endl;
 
-      auto factory = createFactory(os);
+  rentalSystem.displayAvailableMovies();
+  rentalSystem.displayAvailableLanguages();
 
-      Application app(std::move(factory));
-      app.createUI();
-      app.renderUI();
-      app.simulateUserInteraction();
-    }
-
+  std::cout << std::endl << "--- Пример 1: Аренда 'Матрицы' на русском ---" << std::endl;
+  auto movie1 = rentalSystem.rentMovie("1", "russian");
+  if (movie1) {
+    movie1->play();
   }
-  catch (const std::exception& e) {
-    std::cerr << "Ошибка: " << e.what() << std::endl;
-    return 1;
+
+  std::cout << std::endl << "--- Пример 2: Аренда 'Властелина колец' на английском ---" << std::endl;
+  auto movie2 = rentalSystem.rentMovie("2", "english");
+  if (movie2) {
+    movie2->play();
+  }
+
+  std::cout << std::endl << "--- Пример 3: Смена языка во время просмотра ---" << std::endl;
+  auto movie3 = rentalSystem.rentMovie("3", "english");
+  if (movie3) {
+    movie3->play();
+
+    std::cout << std::endl << ">>> Смена языка на русский..." << std::endl;
+    movie3->changeLanguage(std::make_unique<RussianFilmFactory>());
+    movie3->play();
+
+    std::cout << std::endl << ">>> Смена языка на английский..." << std::endl;
+    movie3->changeLanguage(std::make_unique<EnglishFilmFactory>());
+    movie3->play();
+  }
+
+  std::cout << std::endl << "--- Пример 4: Попытка аренды с неподдерживаемым языком ---" << std::endl;
+  auto movie4 = rentalSystem.rentMovie("1", "spanish");
+  if (!movie4) {
+    std::cout << "Не удалось арендовать фильм!" << std::endl;
+  }
+
+  std::cout << std::endl << "--- Проверка согласованности языка звука и субтитров ---" << std::endl;
+  auto testMovie = rentalSystem.rentMovie("4", "russian");
+  if (testMovie) {
+    testMovie->play();
+    std::cout << "Текущий язык: " << testMovie->getCurrentLanguage() << std::endl;
+    std::cout << "✓ Язык звука и субтитров всегда согласованы!" << std::endl;
   }
 
   return 0;
